@@ -1,0 +1,1120 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0A0A0A">
+<meta name="robots" content="noindex, nofollow">
+<title>Claude Remote — пульт</title>
+<style>
+:root {
+  --bg: #0A0A0A; --bg2: #050505; --surface: #111113; --surface2: #16161A;
+  --border: rgba(255,255,255,.08); --border2: rgba(255,255,255,.16);
+  --text: #F5F5F5; --text2: #9A9A9F; --text3: #5A5A60;
+  --ok: #4ADE80; --warn: #FBBF24; --bad: #F87171; --accent: #FFFFFF;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --ease: cubic-bezier(.16,1,.3,1);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+body { background: var(--bg2); color: var(--text); font-family: var(--sans); font-size: 15px; overflow: hidden; }
+button, input, textarea, select { font: inherit; color: inherit; }
+.hidden { display: none !important; }
+.sp { flex: 1; }
+.mono { font-family: var(--mono); }
+
+/* ── вход ── */
+.gate { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: var(--bg2); z-index: 50; }
+.gate .card { width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 26px; }
+.gate h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.gate p { color: var(--text2); font-size: 13px; margin-bottom: 18px; line-height: 1.5; }
+.gate input { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 12px; padding: 13px 14px; font-family: var(--mono); font-size: 13px; }
+.gate button { width: 100%; margin-top: 12px; background: var(--accent); color: #000; border: 0; border-radius: 12px; padding: 13px; font-weight: 650; cursor: pointer; }
+.gate .err { color: var(--bad); font-size: 12.5px; margin-top: 10px; min-height: 16px; }
+
+/* ── каркас ── */
+.app { display: grid; grid-template-columns: 288px 1fr; grid-template-rows: 54px 1fr; height: 100%; }
+.top { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 0 14px;
+  background: var(--bg); border-bottom: 1px solid var(--border); }
+.top .ttl { font-weight: 650; letter-spacing: -.01em; }
+.top .ttl i { color: var(--text3); font-style: normal; font-weight: 400; font-size: 13px; }
+.iconbtn { background: transparent; border: 1px solid var(--border); border-radius: 10px; width: 36px; height: 36px;
+  display: grid; place-items: center; cursor: pointer; color: var(--text2); font-size: 15px; }
+.iconbtn:hover { border-color: var(--border2); color: var(--text); }
+#btnMenu { display: none; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); box-shadow: 0 0 0 3px rgba(255,255,255,.04); }
+.dot.on { background: var(--ok); }
+.dot.off { background: var(--bad); }
+</style>
+<style>
+/* ── список сессий ── */
+.side { background: var(--bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+.side-h { display: flex; align-items: center; gap: 8px; padding: 14px 14px 10px; font-size: 11px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text3); }
+.slist { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
+.sitem { border: 1px solid var(--border); background: var(--surface); border-radius: 14px; padding: 11px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .2s var(--ease); }
+.sitem:hover { border-color: var(--border2); }
+.sitem.on { border-color: var(--accent); background: var(--surface2); }
+.sitem .r1 { display: flex; align-items: center; gap: 7px; font-weight: 600; font-size: 14px; }
+.sitem .r2 { color: var(--text3); font-size: 11.5px; margin-top: 4px; font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sitem .r3 { color: var(--text2); font-size: 11px; margin-top: 5px; display: flex; gap: 10px; }
+.spin { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--text3); border-top-color: var(--ok); animation: sp .8s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.side-f { border-top: 1px solid var(--border); padding: 12px 14px; font-size: 12px; color: var(--text2); }
+.side-f b { color: var(--text); }
+.side-f .row { display: flex; justify-content: space-between; margin-bottom: 5px; }
+
+/* ── чат ── */
+.main { display: flex; flex-direction: column; min-height: 0; background: var(--bg2); }
+.sesbar { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-bottom: 1px solid var(--border);
+  background: var(--bg); overflow-x: auto; white-space: nowrap; min-height: 48px; }
+.tag { border: 1px solid var(--border); background: var(--surface); border-radius: 100px; padding: 5px 11px; font-size: 11.5px; color: var(--text2); cursor: pointer; }
+.tag b { color: var(--text); font-weight: 600; }
+.tag:hover { border-color: var(--border2); }
+.chat { flex: 1; overflow-y: auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 12px; }
+.msg { max-width: 780px; }
+.msg.user { align-self: flex-end; background: var(--surface2); border: 1px solid var(--border2); border-radius: 16px 16px 4px 16px; padding: 10px 14px; white-space: pre-wrap; word-break: break-word; }
+.msg.asst { align-self: flex-start; white-space: pre-wrap; word-break: break-word; line-height: 1.62; }
+.msg.asst pre { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; margin: 8px 0; white-space: pre; }
+.msg.asst code { font-family: var(--mono); font-size: .92em; background: var(--surface2); padding: 1px 5px; border-radius: 5px; }
+.msg.tool { align-self: flex-start; font-family: var(--mono); font-size: 12px; color: var(--text2); background: var(--surface); border: 1px solid var(--border); border-left: 2px solid var(--warn); border-radius: 8px; padding: 7px 10px; max-width: 100%; overflow-x: auto; }
+.msg.tool b { color: var(--text); }
+.msg.res { align-self: flex-start; font-family: var(--mono); font-size: 11.5px; color: var(--text3); border-left: 2px solid var(--border2); padding: 4px 10px; max-width: 100%; cursor: pointer; white-space: pre-wrap; max-height: 78px; overflow: hidden; }
+.msg.res.open { max-height: none; color: var(--text2); }
+.msg.res.bad { border-left-color: var(--bad); color: var(--bad); }
+.msg.sys { align-self: center; font-size: 11.5px; color: var(--text3); text-align: center; }
+.msg.err { align-self: flex-start; font-size: 13px; color: var(--bad); border: 1px solid rgba(248,113,113,.3); background: rgba(248,113,113,.06); border-radius: 12px; padding: 9px 12px; white-space: pre-wrap; }
+.msg.done { align-self: center; font-size: 11px; color: var(--text3); border-top: 1px solid var(--border); width: 100%; max-width: 780px; padding-top: 8px; text-align: center; }
+.live { align-self: flex-start; white-space: pre-wrap; line-height: 1.62; color: var(--text); }
+.live::after { content: '▌'; color: var(--text3); animation: bl 1s steps(2) infinite; }
+@keyframes bl { 50% { opacity: 0; } }
+</style>
+<style>
+/* ── ввод ── */
+.composer { border-top: 1px solid var(--border); background: var(--bg); padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); display: flex; gap: 8px; align-items: flex-end; }
+.composer textarea { flex: 1; background: var(--surface); border: 1px solid var(--border2); border-radius: 14px; padding: 11px 13px; resize: none; max-height: 168px; min-height: 44px; line-height: 1.45; }
+.composer textarea:focus { outline: none; border-color: var(--accent); }
+.bigbtn { background: var(--accent); color: #000; border: 0; border-radius: 14px; min-width: 46px; height: 44px; font-size: 16px; font-weight: 700; cursor: pointer; }
+.bigbtn.ghost { background: transparent; color: var(--bad); border: 1px solid rgba(248,113,113,.4); }
+.bigbtn:disabled { opacity: .35; cursor: default; }
+
+/* ── панели-шторки ── */
+.drawer { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 40; display: flex; justify-content: flex-end; }
+.drawer .body { width: min(460px, 100%); background: var(--bg); border-left: 1px solid var(--border); padding: 18px 18px calc(24px + env(safe-area-inset-bottom)); overflow-y: auto; }
+.drawer h2 { font-size: 17px; margin-bottom: 14px; display: flex; align-items: center; }
+.sec { border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 14px; background: var(--surface); }
+.sec h3 { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--text3); margin-bottom: 12px; }
+.f { margin-bottom: 11px; }
+.f label { display: block; font-size: 11.5px; color: var(--text2); margin-bottom: 5px; }
+.f input, .f select, .f textarea { width: 100%; background: var(--bg); border: 1px solid var(--border2); border-radius: 10px; padding: 9px 11px; font-size: 13.5px; }
+.f input.mono { font-family: var(--mono); font-size: 12px; }
+.btn { background: var(--surface2); border: 1px solid var(--border2); border-radius: 10px; padding: 9px 13px; font-size: 13px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 650; }
+.btn.danger { color: var(--bad); border-color: rgba(248,113,113,.4); }
+.btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.hint { font-size: 11.5px; color: var(--text3); line-height: 1.5; margin-top: 8px; }
+.urlbox { font-family: var(--mono); font-size: 11.5px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 10px; word-break: break-all; color: var(--text2); }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 3px 9px; border-radius: 100px; border: 1px solid var(--border); color: var(--text2); }
+.pill.on { color: var(--ok); border-color: rgba(74,222,128,.35); }
+.pill.off { color: var(--text3); }
+.klist { max-height: 210px; overflow-y: auto; }
+.kitem { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 7px 0; border-bottom: 1px solid var(--border); }
+.kitem:last-child { border-bottom: 0; }
+.kitem .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kitem .nm .sub { display: block; color: var(--text3); font-size: 11px; }
+#apBox .row { display: flex; justify-content: space-between; font-size: 12px; color: var(--text2); margin-bottom: 5px; }
+#apBox .row b { color: var(--text); }
+.dirlist { max-height: 46vh; overflow-y: auto; margin: 8px 0; }
+.diritem { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px; cursor: pointer; font-family: var(--mono); font-size: 12.5px; }
+.diritem:hover { border-color: var(--accent); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 84px; background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 12px; padding: 10px 16px; font-size: 13px; z-index: 60; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(-6px); }
+
+@media (max-width: 860px) {
+  .app { grid-template-columns: 1fr; }
+  #btnMenu { display: grid; }
+  .side { position: fixed; top: 54px; bottom: 0; left: 0; width: 84%; max-width: 320px; z-index: 30;
+    transform: translateX(-102%); transition: transform .28s var(--ease); }
+  .side.open { transform: none; box-shadow: 0 0 60px rgba(0,0,0,.7); }
+  .msg { max-width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="card">
+    <h1>Claude Remote</h1>
+    <p>Пульт управления Claude Code. Введи токен доступа — он показан в локальной админке агрегатора и в <code>config.json</code> (<code>control.token</code>).</p>
+    <input id="tokenInput" type="password" placeholder="токен доступа" autocomplete="current-password">
+    <button id="loginBtn">Войти</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+</div>
+
+<div class="app hidden" id="app">
+  <header class="top">
+    <button class="iconbtn" id="btnMenu">☰</button>
+    <div class="ttl">Claude Remote <i id="topInfo"></i></div>
+    <div class="sp"></div>
+    <span class="dot" id="liveDot" title="поток событий"></span>
+    <button class="iconbtn" id="btnSettings" title="настройки">⚙</button>
+  </header>
+
+  <aside class="side" id="side">
+    <div class="side-h">Сессии <div class="sp"></div><button class="iconbtn" id="btnNew" title="новая сессия">＋</button></div>
+    <div class="slist" id="sessions"></div>
+    <div class="side-f" id="aggBox"></div>
+  </aside>
+
+  <main class="main">
+    <div class="sesbar" id="sesbar"></div>
+    <div class="chat" id="chat"></div>
+    <div class="composer">
+      <textarea id="input" rows="1" placeholder="Что сделать? (Enter — отправить, Shift+Enter — новая строка)"></textarea>
+      <button class="bigbtn" id="btnSend" title="отправить">▶</button>
+      <button class="bigbtn ghost hidden" id="btnStop" title="остановить">■</button>
+    </div>
+  </main>
+</div>
+
+<div class="drawer hidden" id="settings">
+  <div class="body">
+    <h2>Настройки <div class="sp"></div><button class="iconbtn" id="closeSettings">✕</button></h2>
+
+    <div class="sec">
+      <h3>Доступ снаружи · Cloudflare</h3>
+      <div id="tunState"></div>
+      <div class="f" style="margin-top:10px">
+        <label>Режим</label>
+        <select id="cfMode">
+          <option value="quick">Быстрый (*.trycloudflare.com, без настройки)</option>
+          <option value="token">Свой домен (токен туннеля из дашборда)</option>
+        </select>
+      </div>
+      <div class="f" id="cfTokenWrap"><label>Токен туннеля</label><input id="cfToken" class="mono" type="password" placeholder="eyJhIjoi..."></div>
+      <div class="f" id="cfHostWrap"><label>Домен туннеля</label><input id="cfHost" class="mono" placeholder="claude.example.com"></div>
+      <div class="btns">
+        <button class="btn primary" id="tunStart">Запустить</button>
+        <button class="btn" id="tunRestart">Перезапустить</button>
+        <button class="btn danger" id="tunStop">Остановить</button>
+      </div>
+      <div class="hint">Ссылка для входа содержит токен — открывай её только на своих устройствах. Наружу торчит только эта панель; прокси ключей и локальная админка остаются на 127.0.0.1.</div>
+    </div>
+
+    <div class="sec">
+      <h3>Telegram-бот</h3>
+      <div id="tgState"></div>
+      <div class="f" style="margin-top:10px">
+        <label>Токен бота (@BotFather)</label>
+        <input id="tgToken" class="mono" type="password" placeholder="123456:AA...">
+      </div>
+      <div class="f">
+        <label>Код привязки — пришли боту <code>/auth код</code></label>
+        <input id="tgCode" class="mono" readonly>
+      </div>
+      <div class="f">
+        <label>Прокси для api.telegram.org (если недоступен напрямую)</label>
+        <input id="tgProxy" class="mono" placeholder="http://127.0.0.1:10809 или socks5://127.0.0.1:10808">
+      </div>
+      <div class="btns">
+        <button class="btn primary" id="tgStart">Запустить</button>
+        <button class="btn danger" id="tgStop">Остановить</button>
+      </div>
+      <div class="hint">Бот принимает команды только от разрешённых чатов. Первый вход — <code>/auth</code> с кодом выше.</div>
+      <div class="klist" id="tgChats" style="margin-top:10px"></div>
+    </div>
+
+    <div class="sec">
+      <h3>Значения по умолчанию для сессий</h3>
+      <div class="f">
+        <label>Рабочая папка</label>
+        <input id="dfCwd" class="mono">
+        <div class="btns" style="margin-top:6px"><button class="btn" id="dfPick">Выбрать папку…</button></div>
+      </div>
+      <div class="f"><label>Модель (пусто — как в CLI)</label><input id="dfModel" class="mono" placeholder="opus / sonnet / claude-opus-5"></div>
+      <div class="f">
+        <label>Режим разрешений</label>
+        <select id="dfMode"></select>
+      </div>
+      <div class="f">
+        <label>Усилие рассуждений</label>
+        <select id="dfEffort"></select>
+      </div>
+      <div class="f"><label>Путь к claude</label><input id="dfBin" class="mono" placeholder="claude"></div>
+      <div class="f"><label>Лимит времени на ход, мин</label><input id="dfTimeout" type="number" min="1" max="240"></div>
+      <div class="f"><label><input type="checkbox" id="dfStream" style="width:auto;margin-right:7px">Стримить ответ по мере генерации</label></div>
+      <div class="btns"><button class="btn primary" id="dfSave">Сохранить</button></div>
+    </div>
+
+    <div class="sec">
+      <h3>Ссылки на панель</h3>
+      <div class="urlbox" id="urlLocal"></div>
+      <div class="urlbox" id="urlPublic" style="margin-top:8px"></div>
+      <div class="btns" style="margin-top:8px">
+        <button class="btn" id="copyLocal">Копировать локальную</button>
+        <button class="btn" id="copyPublic">Копировать внешнюю</button>
+      </div>
+      <div class="hint" style="margin-top:10px">Управление ключами — там же, по адресу <code>/keys</code>:</div>
+      <div class="urlbox" id="urlKeys" style="margin-top:6px"></div>
+      <div class="btns" style="margin-top:8px">
+        <button class="btn" id="openKeys">Открыть ключи</button>
+        <button class="btn" id="copyKeys">Копировать ссылку</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>Агрегатор ключей</h3>
+      <div id="aggPanel"></div>
+      <div class="btns" style="margin-top:10px">
+        <button class="btn" id="aggTest">Проверить все ключи</button>
+        <button class="btn" id="aggPing">Пинг сейчас</button>
+        <button class="btn" id="aggReset">Сбросить статусы</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <h3>Авто-пинг ключей</h3>
+      <div id="apBox"></div>
+      <div class="f"><label><input type="checkbox" id="apOn" style="width:auto;margin-right:7px">Проверять ключи по расписанию</label></div>
+      <div class="f"><label>Интервал, минут</label><input id="apMin" type="number" min="1" max="1440"></div>
+      <div class="f">
+        <label>Кого проверять</label>
+        <select id="apScope">
+          <option value="broken">только проблемные</option>
+          <option value="all">все ключи</option>
+        </select>
+      </div>
+      <div class="f"><label><input type="checkbox" id="apSticky" style="width:auto;margin-right:7px">Проверять и снятые до ручного сброса</label></div>
+      <div class="f"><label><input type="checkbox" id="apNotify" style="width:auto;margin-right:7px">Писать в этот чат Telegram, когда ключи ожили</label></div>
+      <div class="btns"><button class="btn primary" id="apSave">Сохранить</button></div>
+    </div>
+
+    <div class="btns" style="margin-bottom:10px"><button class="btn danger" id="btnLogout">Выйти из панели</button></div>
+  </div>
+</div>
+
+<div class="drawer hidden" id="newSes">
+  <div class="body">
+    <h2>Новая сессия <div class="sp"></div><button class="iconbtn" id="closeNew">✕</button></h2>
+    <div class="sec">
+      <div class="f"><label>Название</label><input id="nsTitle" placeholder="например: агрегатор"></div>
+      <div class="f">
+        <label>Рабочая папка</label>
+        <input id="nsCwd" class="mono">
+        <div class="btns" style="margin-top:6px"><button class="btn" id="nsPick">Выбрать папку…</button></div>
+      </div>
+      <div class="f"><label>Модель</label><input id="nsModel" class="mono" placeholder="пусто — по умолчанию"></div>
+      <div class="f"><label>Режим разрешений</label><select id="nsMode"></select></div>
+      <div class="f"><label>Усилие</label><select id="nsEffort"></select></div>
+      <div class="btns"><button class="btn primary" id="nsCreate">Создать</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer hidden" id="browser">
+  <div class="body">
+    <h2>Папка <div class="sp"></div><button class="iconbtn" id="closeBrowser">✕</button></h2>
+    <div class="sec">
+      <div class="urlbox" id="brPath"></div>
+      <div class="dirlist" id="brList"></div>
+      <div class="btns">
+        <button class="btn primary" id="brUse">Выбрать эту папку</button>
+        <button class="btn" id="brUp">На уровень выше</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer hidden" id="sesEdit">
+  <div class="body">
+    <h2>Параметры сессии <div class="sp"></div><button class="iconbtn" id="closeEdit">✕</button></h2>
+    <div class="sec">
+      <div class="f"><label>Название</label><input id="edTitle"></div>
+      <div class="f"><label>Модель</label><input id="edModel" class="mono"></div>
+      <div class="f"><label>Режим разрешений</label><select id="edMode"></select></div>
+      <div class="f"><label>Усилие</label><select id="edEffort"></select></div>
+      <div class="btns">
+        <button class="btn primary" id="edSave">Сохранить</button>
+        <button class="btn" id="edClear">Сбросить контекст</button>
+        <button class="btn danger" id="edDel">Удалить сессию</button>
+      </div>
+      <div class="hint" id="edInfo"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const S = {
+  token: localStorage.getItem('ccpanel.token') || '',
+  state: null,
+  cur: '',            // выбранная сессия
+  msgs: new Map(),    // sessionId -> массив сообщений
+  live: new Map(),    // sessionId -> текст в процессе генерации
+  es: null,
+  modes: ['acceptEdits', 'auto', 'bypassPermissions', 'manual', 'dontAsk', 'plan'],
+  efforts: ['', 'low', 'medium', 'high', 'xhigh', 'max'],
+  brTarget: null,     // куда вернуть выбранную папку
+  brPath: ''
+};
+
+const MODE_RU = {
+  acceptEdits: 'править файлы без спроса', auto: 'авто', bypassPermissions: 'без ограничений',
+  manual: 'спрашивать', dontAsk: 'не спрашивать', plan: 'только планировать'
+};
+
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+async function api(path, opts) {
+  const o = Object.assign({ headers: {} }, opts || {});
+  o.headers['x-panel-token'] = S.token;
+  if (o.body !== undefined && typeof o.body !== 'string') {
+    o.headers['content-type'] = 'application/json';
+    o.body = JSON.stringify(o.body);
+    o.method = o.method || 'POST';
+  }
+  const r = await fetch(path, o);
+  let data = {};
+  try { data = await r.json(); } catch (e) {}
+  if (r.status === 401) { logout(true); throw new Error('нужен вход'); }
+  if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+  return data;
+}
+
+function esc(s) {
+  return String(s === undefined || s === null ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function ago(ts) {
+  if (!ts) return '—';
+  const d = Math.max(0, Date.now() - ts) / 1000;
+  if (d < 60) return Math.round(d) + ' с';
+  if (d < 3600) return Math.round(d / 60) + ' мин';
+  if (d < 86400) return Math.round(d / 3600) + ' ч';
+  return Math.round(d / 86400) + ' дн';
+}
+function money(v) { return '$' + (Number(v) || 0).toFixed(Math.abs(v) < 1 ? 4 : 2); }
+function shortPath(p) {
+  const s = String(p || '');
+  return s.length > 38 ? '…' + s.slice(-37) : s;
+}
+function fillSelect(el, values, cur, labels) {
+  el.innerHTML = values.map(v =>
+    `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc((labels && labels[v]) || v || '— по умолчанию —')}</option>`
+  ).join('');
+}
+/* ── вход ── */
+async function tryLogin(token) {
+  const r = await fetch('/api/login', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token })
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || 'не удалось войти');
+  S.token = token;
+  localStorage.setItem('ccpanel.token', token);
+}
+
+function logout(silent) {
+  S.token = '';
+  localStorage.removeItem('ccpanel.token');
+  if (S.es) { try { S.es.close(); } catch (e) {} S.es = null; }
+  $('app').classList.add('hidden');
+  $('gate').classList.remove('hidden');
+  if (!silent) fetch('/api/logout', { method: 'POST' }).catch(() => {});
+}
+
+async function enter() {
+  $('gate').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  const st = await api('/api/state');
+  applyState(st);
+  openStream();
+}
+
+$('loginBtn').onclick = async () => {
+  const t = $('tokenInput').value.trim();
+  if (!t) return;
+  $('loginErr').textContent = '';
+  try { await tryLogin(t); await enter(); }
+  catch (e) { $('loginErr').textContent = e.message; }
+};
+$('tokenInput').onkeydown = e => { if (e.key === 'Enter') $('loginBtn').click(); };
+
+/* ── поток событий ── */
+function openStream() {
+  if (S.es) { try { S.es.close(); } catch (e) {} }
+  const es = new EventSource('/api/stream');
+  S.es = es;
+  es.onopen = () => { $('liveDot').className = 'dot on'; };
+  es.onerror = () => { $('liveDot').className = 'dot off'; };
+  es.onmessage = e => {
+    let ev;
+    try { ev = JSON.parse(e.data); } catch (err) { return; }
+    onEvent(ev);
+  };
+}
+
+function onEvent(ev) {
+  if (ev.t === 'hello' || ev.t === 'state') { applyState(ev.state); return; }
+  if (ev.t === 'ping') { $('liveDot').className = 'dot on'; return; }
+  if (ev.t === 'tunnel') {
+    if (S.state) S.state.tunnel = ev.tunnel;
+    renderTunnel();
+    renderLinks();
+    return;
+  }
+  // Агрегатор шлёт только свой блок — не трогаем остальной снимок состояния.
+  if (ev.t === 'agg') {
+    if (!S.state) return;
+    S.state.aggregator = ev.aggregator;
+    if (ev.aggregator && ev.aggregator.autoPing) S.state.autoPing = ev.aggregator.autoPing;
+    renderAgg();
+    renderAggPanel();
+    renderAutoPing();
+    return;
+  }
+  if (ev.t === 'delta') {
+    S.live.set(ev.sessionId, (S.live.get(ev.sessionId) || '') + ev.text);
+    if (ev.sessionId === S.cur) renderLive();
+    return;
+  }
+  if (ev.t === 'msg') {
+    const arr = S.msgs.get(ev.sessionId) || [];
+    arr.push(ev.msg);
+    if (arr.length > 400) arr.splice(0, arr.length - 400);
+    S.msgs.set(ev.sessionId, arr);
+    if (ev.msg.role === 'assistant' || ev.msg.role === 'done' || ev.msg.role === 'error') S.live.delete(ev.sessionId);
+    if (ev.sessionId === S.cur) { appendMsg(ev.msg); renderLive(); }
+    return;
+  }
+  if (ev.t === 'session') {
+    if (!S.state) return;
+    const i = S.state.sessions.findIndex(x => x.id === ev.session.id);
+    if (i < 0) S.state.sessions.push(ev.session); else S.state.sessions[i] = ev.session;
+    renderSessions();
+    if (ev.session.id === S.cur) renderSesbar();
+    return;
+  }
+  if (ev.t === 'removed') {
+    if (!S.state) return;
+    S.state.sessions = S.state.sessions.filter(x => x.id !== ev.sessionId);
+    S.msgs.delete(ev.sessionId);
+    S.live.delete(ev.sessionId);
+    if (S.cur === ev.sessionId) { S.cur = ''; pickFirst(); }
+    renderSessions();
+    return;
+  }
+}
+/* ── общий рендер ── */
+function applyState(st) {
+  if (!st) return;
+  S.state = st;
+  if (st.stats) {
+    if (Array.isArray(st.stats.permissionModes)) S.modes = st.stats.permissionModes;
+    if (Array.isArray(st.stats.efforts)) S.efforts = st.stats.efforts;
+  }
+  renderSessions();
+  renderTop();
+  renderAgg();
+  renderTunnel();
+  renderTelegram();
+  renderLinks();
+  renderAutoPing();
+  if (!S.cur || !st.sessions.some(s => s.id === S.cur)) pickFirst();
+  else renderSesbar();
+}
+
+function curSes() {
+  return (S.state && S.state.sessions.find(s => s.id === S.cur)) || null;
+}
+
+function pickFirst() {
+  const first = S.state && S.state.sessions[0];
+  if (first) select(first.id);
+  else { $('chat').innerHTML = '<div class="msg sys">Сессий нет. Нажми ＋, чтобы создать.</div>'; renderSesbar(); }
+}
+
+function renderTop() {
+  const st = S.state;
+  if (!st) return;
+  const t = st.tunnel || {};
+  $('topInfo').textContent = `· ${st.stats.running} из ${st.stats.sessions} в работе` + (t.running && t.url ? ' · снаружи' : '');
+}
+
+function renderSessions() {
+  const box = $('sessions');
+  const list = (S.state && S.state.sessions) || [];
+  if (!list.length) { box.innerHTML = '<div class="msg sys" style="padding:12px 4px">пусто</div>'; return; }
+  box.innerHTML = list.map(s => `
+    <div class="sitem${s.id === S.cur ? ' on' : ''}" data-id="${esc(s.id)}">
+      <div class="r1">${s.status === 'running' ? '<span class="spin"></span>' : '<span class="dot' + (s.lastError ? ' off' : '') + '"></span>'}<span>${esc(s.name)}</span></div>
+      <div class="r2">${esc(shortPath(s.cwd))}</div>
+      <div class="r3"><span>${s.turns} ход.</span><span>${money(s.costUsd)}</span><span>${ago(s.lastAt)}</span>${s.queued ? '<span>+' + s.queued + ' в очереди</span>' : ''}</div>
+    </div>`).join('');
+  for (const el of box.querySelectorAll('.sitem')) {
+    el.onclick = () => { select(el.dataset.id); $('side').classList.remove('open'); };
+  }
+}
+
+function renderSesbar() {
+  const s = curSes();
+  const bar = $('sesbar');
+  if (!s) { bar.innerHTML = ''; return; }
+  bar.innerHTML = [
+    `<span class="tag" id="tgEditCwd" title="сменить папку">📁 <b>${esc(shortPath(s.cwd))}</b></span>`,
+    `<span class="tag" id="tgEditSes">🤖 <b>${esc(s.model || 'по умолчанию')}</b></span>`,
+    `<span class="tag" id="tgEditMode">🔓 <b>${esc(MODE_RU[s.permissionMode] || s.permissionMode)}</b></span>`,
+    s.effort ? `<span class="tag">🧠 <b>${esc(s.effort)}</b></span>` : '',
+    `<span class="tag">${s.turns} ход. · ${money(s.costUsd)} · ${(s.tokensOut / 1000).toFixed(1)}k out</span>`,
+    s.lastError ? `<span class="tag" style="color:var(--bad)">${esc(s.lastError.slice(0, 60))}</span>` : ''
+  ].join('');
+  $('tgEditCwd').onclick = () => openBrowser('session', s.cwd);
+  $('tgEditSes').onclick = openEdit;
+  $('tgEditMode').onclick = openEdit;
+  $('btnStop').classList.toggle('hidden', s.status !== 'running');
+  $('btnSend').classList.toggle('hidden', false);
+}
+
+function renderAgg() {
+  const a = S.state && S.state.aggregator;
+  if (!a || a.error) { $('aggBox').innerHTML = ''; return; }
+  const ap = S.state.autoPing || a.autoPing || null;
+  const apLine = ap
+    ? (ap.busy ? 'идёт проверка' : (ap.enabled ? 'каждые ' + Math.round(ap.intervalMs / 60000) + ' мин' : 'выключен'))
+    : '—';
+  $('aggBox').innerHTML = `
+    <div class="row"><span>Ключи</span><b>${a.ok} / ${a.total}</b></div>
+    <div class="row"><span>Активный</span><b>${esc(a.active || '—')}</b></div>
+    <div class="row"><span>Авто-пинг</span><b>${esc(apLine)}</b></div>
+    <div class="row"><span>Запросы</span><b>${a.requests}</b></div>
+    <div class="row"><span>Переключений</span><b>${a.failovers}</b></div>`;
+}
+/* ── чат ── */
+function fmt(text) {
+  const parts = String(text || '').split(/```/);
+  let out = '';
+  for (let i = 0; i < parts.length; i++) {
+    if (i % 2) {
+      const body = parts[i].replace(/^[\w+-]*\n/, '');
+      out += '<pre>' + esc(body.replace(/\n$/, '')) + '</pre>';
+    } else {
+      out += esc(parts[i]).replace(/`([^`\n]+)`/g, (m, c) => '<code>' + c + '</code>');
+    }
+  }
+  return out;
+}
+
+function msgNode(m) {
+  const d = document.createElement('div');
+  if (m.role === 'user') {
+    d.className = 'msg user';
+    d.textContent = m.text;
+  } else if (m.role === 'assistant') {
+    d.className = 'msg asst';
+    d.innerHTML = (m.sub ? '<span style="color:var(--text3)">↳ субагент</span>\n' : '') + fmt(m.text);
+  } else if (m.role === 'tool') {
+    d.className = 'msg tool';
+    d.innerHTML = '<b>' + esc(m.tool || 'tool') + '</b> ' + esc(m.text);
+  } else if (m.role === 'tool_result') {
+    d.className = 'msg res' + (m.isError ? ' bad' : '');
+    d.textContent = m.text;
+    d.title = 'нажми, чтобы развернуть';
+    d.onclick = () => d.classList.toggle('open');
+  } else if (m.role === 'error') {
+    d.className = 'msg err';
+    d.textContent = m.text;
+  } else if (m.role === 'done') {
+    d.className = 'msg done';
+    const sec = Math.round((m.durationMs || 0) / 1000);
+    d.textContent = `готово · ${sec} с · ${money(m.costUsd)}${m.tokensOut ? ' · ' + m.tokensOut + ' токенов' : ''}`;
+  } else {
+    d.className = 'msg sys';
+    d.textContent = m.text;
+  }
+  return d;
+}
+
+function atBottom() {
+  const c = $('chat');
+  return c.scrollHeight - c.scrollTop - c.clientHeight < 120;
+}
+function toBottom() {
+  const c = $('chat');
+  c.scrollTop = c.scrollHeight;
+}
+
+function appendMsg(m) {
+  const stick = atBottom();
+  const c = $('chat');
+  const liveEl = c.querySelector('.live');
+  if (liveEl) c.insertBefore(msgNode(m), liveEl);
+  else c.appendChild(msgNode(m));
+  if (stick) toBottom();
+}
+
+function renderLive() {
+  const c = $('chat');
+  let el = c.querySelector('.live');
+  const text = S.live.get(S.cur) || '';
+  if (!text) { if (el) el.remove(); return; }
+  const stick = atBottom();
+  if (!el) { el = document.createElement('div'); el.className = 'live'; c.appendChild(el); }
+  el.textContent = text.length > 4000 ? '…' + text.slice(-4000) : text;
+  if (stick) toBottom();
+}
+
+async function select(id) {
+  S.cur = id;
+  renderSessions();
+  renderSesbar();
+  const c = $('chat');
+  c.innerHTML = '<div class="msg sys">загрузка…</div>';
+  let h;
+  try { h = await api('/api/sessions/' + encodeURIComponent(id) + '/history'); }
+  catch (e) { c.innerHTML = '<div class="msg err">' + esc(e.message) + '</div>'; return; }
+  S.msgs.set(id, h.messages || []);
+  if (h.session && h.session.live) S.live.set(id, h.session.live);
+  if (S.state) {
+    const i = S.state.sessions.findIndex(x => x.id === id);
+    if (i >= 0) S.state.sessions[i] = h.session;
+  }
+  c.innerHTML = '';
+  const frag = document.createDocumentFragment();
+  for (const m of (h.messages || [])) frag.appendChild(msgNode(m));
+  c.appendChild(frag);
+  renderLive();
+  renderSesbar();
+  toBottom();
+  $('input').focus();
+}
+/* ── отправка ── */
+const inp = $('input');
+function autosize() {
+  inp.style.height = 'auto';
+  inp.style.height = Math.min(168, inp.scrollHeight) + 'px';
+}
+inp.addEventListener('input', autosize);
+inp.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey) { e.preventDefault(); send(); }
+});
+
+async function send() {
+  const text = inp.value.trim();
+  if (!text) return;
+  if (!S.cur) { toast('сначала создай сессию'); return; }
+  inp.value = '';
+  autosize();
+  try { await api('/api/sessions/' + encodeURIComponent(S.cur) + '/prompt', { body: { text } }); }
+  catch (e) { toast(e.message); inp.value = text; autosize(); }
+}
+$('btnSend').onclick = send;
+$('btnStop').onclick = async () => {
+  if (!S.cur) return;
+  try { await api('/api/sessions/' + encodeURIComponent(S.cur) + '/stop', { method: 'POST' }); toast('остановлено'); }
+  catch (e) { toast(e.message); }
+};
+
+$('btnMenu').onclick = () => $('side').classList.toggle('open');
+$('btnSettings').onclick = openSettings;
+$('closeSettings').onclick = () => $('settings').classList.add('hidden');
+$('btnLogout').onclick = () => { $('settings').classList.add('hidden'); logout(); };
+
+/* ── создание сессии ── */
+$('btnNew').onclick = () => {
+  const d = (S.state && S.state.defaults) || {};
+  $('nsTitle').value = '';
+  $('nsCwd').value = d.defaultCwd || '';
+  $('nsModel').value = d.defaultModel || '';
+  fillSelect($('nsMode'), S.modes, d.permissionMode, MODE_RU);
+  fillSelect($('nsEffort'), S.efforts, d.defaultEffort);
+  $('newSes').classList.remove('hidden');
+};
+$('closeNew').onclick = () => $('newSes').classList.add('hidden');
+$('nsPick').onclick = () => openBrowser('new', $('nsCwd').value);
+$('nsCreate').onclick = async () => {
+  try {
+    const s = await api('/api/sessions', {
+      body: {
+        name: $('nsTitle').value.trim(), cwd: $('nsCwd').value.trim(), model: $('nsModel').value.trim(),
+        permissionMode: $('nsMode').value, effort: $('nsEffort').value
+      }
+    });
+    $('newSes').classList.add('hidden');
+    if (S.state && !S.state.sessions.some(x => x.id === s.id)) S.state.sessions.unshift(s);
+    select(s.id);
+    toast('сессия создана');
+  } catch (e) { toast(e.message); }
+};
+
+/* ── правка сессии ── */
+function openEdit() {
+  const s = curSes();
+  if (!s) return;
+  $('edTitle').value = s.name;
+  $('edModel').value = s.model || '';
+  fillSelect($('edMode'), S.modes, s.permissionMode, MODE_RU);
+  fillSelect($('edEffort'), S.efforts, s.effort || '');
+  $('edInfo').innerHTML = `id: <code>${esc(s.id)}</code><br>папка: <code>${esc(s.cwd)}</code><br>сессия Claude: <code>${esc(s.claudeSessionId || '—')}</code><br>${s.turns} ходов · ${money(s.costUsd)} · ${s.tokensIn} in / ${s.tokensOut} out`;
+  $('sesEdit').classList.remove('hidden');
+}
+$('closeEdit').onclick = () => $('sesEdit').classList.add('hidden');
+$('edSave').onclick = async () => {
+  try {
+    await api('/api/sessions/' + encodeURIComponent(S.cur), {
+      method: 'PATCH',
+      body: { name: $('edTitle').value.trim(), model: $('edModel').value.trim(), permissionMode: $('edMode').value, effort: $('edEffort').value }
+    });
+    $('sesEdit').classList.add('hidden');
+    toast('сохранено');
+  } catch (e) { toast(e.message); }
+};
+$('edClear').onclick = async () => {
+  try { await api('/api/sessions/' + encodeURIComponent(S.cur) + '/clear', { method: 'POST' }); $('sesEdit').classList.add('hidden'); select(S.cur); toast('контекст очищен'); }
+  catch (e) { toast(e.message); }
+};
+$('edDel').onclick = async () => {
+  if (!confirm('Удалить сессию целиком?')) return;
+  try { await api('/api/sessions/' + encodeURIComponent(S.cur), { method: 'DELETE' }); $('sesEdit').classList.add('hidden'); toast('удалено'); }
+  catch (e) { toast(e.message); }
+};
+/* ── выбор папки ── */
+async function openBrowser(target, start) {
+  S.brTarget = target;
+  $('browser').classList.remove('hidden');
+  await loadDir(start || '');
+}
+async function loadDir(p) {
+  try {
+    const d = await api('/api/browse?path=' + encodeURIComponent(p || ''));
+    S.brPath = d.path;
+    S.brParent = d.parent;
+    $('brPath').textContent = d.path;
+    $('brList').innerHTML = d.dirs.length
+      ? d.dirs.map(x => `<div class="diritem" data-p="${esc(x.path)}">📁 ${esc(x.name)}</div>`).join('')
+      : '<div class="hint">вложенных папок нет</div>';
+    for (const el of $('brList').querySelectorAll('.diritem')) el.onclick = () => loadDir(el.dataset.p);
+  } catch (e) { $('brList').innerHTML = '<div class="hint" style="color:var(--bad)">' + esc(e.message) + '</div>'; }
+}
+$('closeBrowser').onclick = () => $('browser').classList.add('hidden');
+$('brUp').onclick = () => { if (S.brParent) loadDir(S.brParent); };
+$('brUse').onclick = async () => {
+  const p = S.brPath;
+  $('browser').classList.add('hidden');
+  if (S.brTarget === 'new') $('nsCwd').value = p;
+  else if (S.brTarget === 'defaults') $('dfCwd').value = p;
+  else if (S.brTarget === 'session' && S.cur) {
+    try { await api('/api/sessions/' + encodeURIComponent(S.cur), { method: 'PATCH', body: { cwd: p } }); select(S.cur); toast('папка сменена'); }
+    catch (e) { toast(e.message); }
+  }
+};
+
+/* ── настройки ── */
+function openSettings() {
+  const st = S.state;
+  if (!st) return;
+  const d = st.defaults || {};
+  $('dfCwd').value = d.defaultCwd || '';
+  $('dfModel').value = d.defaultModel || '';
+  fillSelect($('dfMode'), S.modes, d.permissionMode, MODE_RU);
+  fillSelect($('dfEffort'), S.efforts, d.defaultEffort || '');
+  $('dfBin').value = d.claudeBin || 'claude';
+  $('dfTimeout').value = Math.round((d.turnTimeoutMs || 1800000) / 60000);
+  $('dfStream').checked = d.stream !== false;
+  const cf = st.cloudflare || {};
+  $('cfMode').value = cf.mode || 'quick';
+  $('cfHost').value = cf.hostname || '';
+  $('cfToken').value = '';
+  $('cfToken').placeholder = cf.hasToken ? '•••• сохранён' : 'eyJhIjoi...';
+  cfModeUi();
+  const tg = st.telegram || {};
+  $('tgToken').value = '';
+  $('tgToken').placeholder = tg.hasToken ? '•••• сохранён' : '123456:AA...';
+  $('tgCode').value = tg.pairingCode || '';
+  $('tgProxy').value = tg.proxy || '';
+  renderTunnel();
+  renderTelegram();
+  renderLinks();
+  renderAggPanel();
+  $('settings').classList.remove('hidden');
+}
+function cfModeUi() {
+  const named = $('cfMode').value === 'token';
+  $('cfTokenWrap').classList.toggle('hidden', !named);
+  $('cfHostWrap').classList.toggle('hidden', !named);
+}
+$('cfMode').onchange = cfModeUi;
+
+function renderTunnel() {
+  const t = (S.state && S.state.tunnel) || {};
+  const box = $('tunState');
+  if (!box) return;
+  box.innerHTML = [
+    `<span class="pill ${t.running ? 'on' : 'off'}">${t.running ? 'работает' : 'выключен'}</span> `,
+    `<span class="pill">${esc(t.mode || 'quick')}</span>`,
+    t.url ? `<div class="urlbox" style="margin-top:8px">${esc(t.url)}</div>` : '',
+    t.lastError ? `<div class="hint" style="color:var(--bad)">${esc(t.lastError)}</div>` : '',
+    t.bin ? `<div class="hint">cloudflared: <code>${esc(t.bin)}</code></div>` : ''
+  ].join('');
+  renderLinks();
+  renderTop();
+}
+
+function renderTelegram() {
+  const tg = (S.state && S.state.telegram) || {};
+  const box = $('tgState');
+  if (!box) return;
+  box.innerHTML = [
+    `<span class="pill ${tg.running ? 'on' : 'off'}">${tg.running ? 'слушает' : 'выключен'}</span> `,
+    tg.username ? `<span class="pill">@${esc(tg.username)}</span>` : '',
+    `<span class="pill">${(tg.allowedChatIds || []).length} чат(ов)</span>`,
+    tg.lastError ? `<div class="hint" style="color:var(--bad)">${esc(tg.lastError)}</div>` : ''
+  ].join('');
+  const chats = $('tgChats');
+  if (!chats) return;
+  const ids = tg.allowedChatIds || [];
+  chats.innerHTML = ids.length
+    ? ids.map(id => `<div class="kitem"><span class="nm mono">${esc(id)}</span><button class="btn danger" data-id="${esc(id)}">отозвать</button></div>`).join('')
+    : '<div class="hint">чатов пока нет — пришли боту <code>/auth</code> с кодом</div>';
+  for (const b of chats.querySelectorAll('button[data-id]')) {
+    b.onclick = async () => {
+      try { const s = await api('/api/telegram/revoke', { body: { chatId: b.dataset.id } }); if (S.state) S.state.telegram = s; renderTelegram(); toast('доступ отозван'); }
+      catch (e) { toast(e.message); }
+    };
+  }
+}
+function renderLinks() {
+  const st = S.state;
+  if (!st || !$('urlLocal')) return;
+  const p = st.panel || {};
+  const t = st.tunnel || {};
+  const base = t.url ? t.url : '';
+  $('urlLocal').textContent = (p.localUrl || '') + '?t=' + (p.token || '');
+  $('urlPublic').textContent = base ? base + '/?t=' + (p.token || '') : 'внешний адрес пока не выдан';
+  // Ключи открываются на том же адресе — отдельный порт наружу не публикуется.
+  $('urlKeys').textContent = (base || (p.localUrl || '').replace(/\/$/, '')) + '/keys?t=' + (p.token || '');
+}
+function copy(text) {
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(() => toast('скопировано'), () => toast('не удалось'));
+  else toast('скопируй вручную');
+}
+$('copyLocal').onclick = () => copy($('urlLocal').textContent);
+$('copyPublic').onclick = () => copy($('urlPublic').textContent);
+$('copyKeys').onclick = () => copy($('urlKeys').textContent);
+$('openKeys').onclick = () => window.open('/keys', '_blank', 'noopener');
+
+/* ── авто-пинг ключей ── */
+function apState() {
+  return (S.state && (S.state.autoPing || (S.state.aggregator && S.state.aggregator.autoPing))) || null;
+}
+function agoRu(ts) {
+  if (!ts) return 'ещё не было';
+  const d = Date.now() - ts;
+  if (d < 60000) return Math.max(1, Math.round(d / 1000)) + ' с назад';
+  return Math.round(d / 60000) + ' мин назад';
+}
+function renderAutoPing() {
+  const box = $('apBox');
+  if (!box) return;
+  const a = apState();
+  if (!a) { box.innerHTML = '<div class="hint">нет данных</div>'; return; }
+  const l = a.last;
+  box.innerHTML =
+    `<div class="row"><span>Состояние</span><b>${a.busy ? 'идёт проверка' : (a.enabled ? 'включён' : 'выключен')}</b></div>` +
+    `<div class="row"><span>Последний проход</span><b>${esc(agoRu(a.lastRunAt))}</b></div>` +
+    (a.enabled ? `<div class="row"><span>Следующий</span><b>${a.nextRunAt ? Math.max(0, Math.round((a.nextRunAt - Date.now()) / 1000)) + ' с' : '—'}</b></div>` : '') +
+    `<div class="row"><span>В очереди</span><b>${a.pending || 0}</b></div>` +
+    (l ? `<div class="hint" style="margin-top:8px">проверено ${l.checked}, живых ${l.ok}, с ошибкой ${l.failed}` +
+      (l.revived && l.revived.length ? '<br>ожили: <b>' + esc(l.revived.join(', ')) + '</b>' : '') + '</div>' : '');
+
+  const busy = id => document.activeElement && document.activeElement.id === id;
+  if (!busy('apOn')) $('apOn').checked = !!a.enabled;
+  if (!busy('apMin')) $('apMin').value = Math.max(1, Math.round(a.intervalMs / 60000));
+  if (!busy('apScope')) $('apScope').value = a.scope || 'broken';
+  if (!busy('apSticky')) $('apSticky').checked = a.includeSticky !== false;
+  if (!busy('apNotify')) $('apNotify').checked = a.notifyTelegram !== false;
+}
+
+$('apSave').onclick = async () => {
+  $('apSave').disabled = true;
+  try {
+    await api('/api/agg/autoping', {
+      body: {
+        enabled: $('apOn').checked,
+        intervalMin: Math.max(0.5, parseFloat($('apMin').value) || 10),
+        scope: $('apScope').value,
+        includeSticky: $('apSticky').checked,
+        notifyTelegram: $('apNotify').checked
+      }
+    });
+    toast('авто-пинг сохранён');
+  } catch (e) { toast(e.message); }
+  finally { $('apSave').disabled = false; }
+};
+
+$('aggPing').onclick = async () => {
+  $('aggPing').disabled = true;
+  $('aggPing').textContent = 'Проверяю…';
+  try {
+    const r = await api('/api/agg/ping-now', { method: 'POST' });
+    const run = r.run || {};
+    if (run.busy) toast('проверка уже идёт');
+    else toast(`проверено ${run.checked || 0}, живых ${run.ok || 0}` +
+      (run.revived && run.revived.length ? ', ожили: ' + run.revived.join(', ') : ''));
+  } catch (e) { toast(e.message); }
+  finally { $('aggPing').disabled = false; $('aggPing').textContent = 'Пинг сейчас'; renderAggPanel(); renderAutoPing(); }
+};
+
+$('aggReset').onclick = async () => {
+  $('aggReset').disabled = true;
+  try {
+    const r = await api('/api/agg/reset-all', { method: 'POST' });
+    toast('снято отметок: ' + (r.reset || 0));
+  } catch (e) { toast(e.message); }
+  finally { $('aggReset').disabled = false; renderAggPanel(); }
+};
+
+const KST = {
+  ok: 'работает', unknown: 'не проверен', rate_limited: 'лимит',
+  down: 'недоступен', exhausted: 'исчерпан', auth_error: 'ошибка ключа'
+};
+
+function renderAggPanel() {
+  const a = (S.state && S.state.aggregator) || null;
+  const box = $('aggPanel');
+  if (!box) return;
+  if (!a || a.error) { box.innerHTML = '<div class="hint">нет данных</div>'; return; }
+  box.innerHTML = `<div class="hint" style="margin:0 0 8px">стратегия: <b>${esc(a.strategy)}</b> · модель по умолчанию: <code>${esc(a.defaultModel || '—')}</code></div>` +
+    '<div class="klist">' + a.providers.map(p => {
+      const bits = [KST[p.status] || p.status];
+      if (p.sticky) bits.push('снят до сброса');
+      if (p.cooldownLeft) bits.push('пауза ' + Math.ceil(p.cooldownLeft / 1000) + ' с');
+      if (p.latency) bits.push(p.latency + ' мс');
+      if (p.enabled === false) bits.push('выключен');
+      return `
+      <div class="kitem">
+        <span class="dot ${p.status === 'ok' ? 'on' : (p.sticky || p.status === 'down' ? 'off' : '')}"></span>
+        <span class="nm">${esc(p.name)}${p.active ? ' · активный' : ''}<span class="sub">${esc(bits.join(' · '))}</span></span>
+        <button class="btn" data-tid="${esc(p.id)}">тест</button>
+        ${p.active ? '' : `<button class="btn" data-pid="${esc(p.id)}">включить</button>`}
+      </div>`;
+    }).join('') + '</div>';
+  for (const b of box.querySelectorAll('button[data-pid]')) {
+    b.onclick = async () => {
+      try { await api('/api/agg/providers/' + encodeURIComponent(b.dataset.pid) + '/activate', { method: 'POST' }); toast('переключено'); }
+      catch (e) { toast(e.message); }
+    };
+  }
+  for (const b of box.querySelectorAll('button[data-tid]')) {
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = '…';
+      try {
+        const r = await api('/api/agg/providers/' + encodeURIComponent(b.dataset.tid) + '/test', { method: 'POST' });
+        toast((r.ok ? '✅ ' : '⚠️ ') + (r.name || '') + ' — ' + (r.info || r.error || ''));
+      } catch (e) { toast(e.message); }
+      finally { b.disabled = false; b.textContent = 'тест'; }
+    };
+  }
+}
+$('aggTest').onclick = async () => {
+  $('aggTest').disabled = true;
+  try { await api('/api/agg/test-all', { method: 'POST' }); toast('проверка завершена'); }
+  catch (e) { toast(e.message); }
+  finally { $('aggTest').disabled = false; renderAggPanel(); }
+};
+
+/* ── сохранение настроек ── */
+async function saveSettings(extra) {
+  const body = Object.assign({
+    defaultCwd: $('dfCwd').value.trim(),
+    defaultModel: $('dfModel').value.trim(),
+    permissionMode: $('dfMode').value,
+    defaultEffort: $('dfEffort').value,
+    claudeBin: $('dfBin').value.trim(),
+    turnTimeoutMs: Math.max(1, parseInt($('dfTimeout').value, 10) || 30) * 60000,
+    stream: $('dfStream').checked
+  }, extra || {});
+  const st = await api('/api/settings', { body });
+  applyState(st);
+  return st;
+}
+$('dfSave').onclick = async () => {
+  try { await saveSettings(); toast('сохранено'); } catch (e) { toast(e.message); }
+};
+$('dfPick').onclick = () => openBrowser('defaults', $('dfCwd').value);
+
+function cfBody() {
+  const o = { mode: $('cfMode').value, hostname: $('cfHost').value.trim(), enabled: true };
+  if ($('cfToken').value.trim()) o.tunnelToken = $('cfToken').value.trim();
+  return { cloudflare: o };
+}
+$('tunStart').onclick = async () => {
+  try { await saveSettings(cfBody()); const t = await api('/api/tunnel/start', { method: 'POST' }); if (S.state) S.state.tunnel = t; renderTunnel(); toast('туннель запускается'); }
+  catch (e) { toast(e.message); }
+};
+$('tunRestart').onclick = async () => {
+  try { await saveSettings(cfBody()); const t = await api('/api/tunnel/restart', { method: 'POST' }); if (S.state) S.state.tunnel = t; renderTunnel(); toast('перезапуск'); }
+  catch (e) { toast(e.message); }
+};
+$('tunStop').onclick = async () => {
+  try { const t = await api('/api/tunnel/stop', { method: 'POST' }); if (S.state) S.state.tunnel = t; renderTunnel(); toast('туннель остановлен'); }
+  catch (e) { toast(e.message); }
+};
+
+$('tgStart').onclick = async () => {
+  const tg = { enabled: true, proxy: $('tgProxy').value.trim() };
+  if ($('tgToken').value.trim()) tg.botToken = $('tgToken').value.trim();
+  try {
+    await saveSettings({ telegram: tg });
+    const r = await api('/api/telegram/start', { method: 'POST' });
+    if (r && r.error) toast(r.error); else toast('бот запущен');
+  } catch (e) { toast(e.message); }
+};
+$('tgStop').onclick = async () => {
+  try { await api('/api/telegram/stop', { method: 'POST' }); toast('бот остановлен'); }
+  catch (e) { toast(e.message); }
+};
+
+for (const el of document.querySelectorAll('.drawer')) {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.add('hidden'); });
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') for (const el of document.querySelectorAll('.drawer')) el.classList.add('hidden');
+});
+
+/* ── старт ── */
+(async () => {
+  // Поток событий (SSE) не умеет отправлять заголовки, поэтому вход всегда
+  // подтверждаем через /api/login — он ставит cookie.
+  if (S.token) {
+    try { await tryLogin(S.token); await enter(); return; } catch (e) {}
+  }
+  // Вход по ссылке ?t=… — cookie уже стоит, токена в localStorage может не быть.
+  try {
+    const r = await fetch('/api/state');
+    if (r.ok) {
+      applyState(await r.json());
+      $('gate').classList.add('hidden');
+      $('app').classList.remove('hidden');
+      openStream();
+      return;
+    }
+  } catch (e) {}
+  $('gate').classList.remove('hidden');
+  $('tokenInput').focus();
+})();
+</script>
+</body>
+</html>

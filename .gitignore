@@ -1,0 +1,8 @@
+# Secrets / local data — never commit
+config.json
+control-sessions.json
+control-sessions.zip
+*.log
+*.tmp
+node_modules/
+.DS_Store
